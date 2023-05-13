@@ -1,0 +1,51 @@
+name: Build strapi
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm run build
+      - name: Download project as artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: bundle
+          path: ./build
+      # - name: Install SSH key
+      #   uses: shimataro/ssh-key-action@v2
+      #   with:
+      #     key: ${{ secrets.SSH_KEY }}
+      #     name: id_rsa # optional
+      #     known_hosts: ${{ secrets.KNOWN_HOSTS }}
+      #     #config: ${{ secrets.CONFIG }} # ssh_config; optional
+      #     if_key_exists: fail # replace / ignore / fail; optional (defaults to fail)
+      # - name: rsync over SSH
+      #   run: rsync -r ./ tom@141.95.175.158:~/www/freshtrack/API
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@master
+        with:
+          name: bundle
+          path: ./dist
+      - name: Deploy project with SSH
+        uses: easingthemes/ssh-deploy@v2.1.4
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          SOURCE: "build"
+          TARGET: "~/www/freshtrack/API"
